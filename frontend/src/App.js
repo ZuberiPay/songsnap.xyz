@@ -148,8 +148,9 @@ function App() {
           <div className="bg-gray-50 rounded-xl p-4 mb-6">
             <h3 className="font-semibold text-gray-800 mb-2">Order Details</h3>
             <p className="text-sm text-gray-600">Order ID: <span className="font-mono font-bold">{orderData.orderId}</span></p>
-            <p className="text-sm text-gray-600">Plan: <span className="capitalize">{orderData.plan}</span></p>
-            {orderData.express && <p className="text-sm text-gray-600">Express Delivery: ✅</p>}
+            <p className="text-sm text-gray-600">Plan: <span className="capitalize">{orderData.plan === 'express' ? 'Express Song' : orderData.plan}</span></p>
+            {orderData.express && <p className="text-sm text-gray-600">⚡ Express Delivery: ✅ (30 minutes)</p>}
+            {!orderData.express && <p className="text-sm text-gray-600">🕐 Standard Delivery: Within 2 hours</p>}
           </div>
           
           <p className="text-gray-600 mb-6">
