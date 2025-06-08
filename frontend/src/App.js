@@ -84,10 +84,18 @@ function App() {
 
   const fulfillOrder = async (orderId) => {
     try {
-      await fetch(`${API_BASE_URL}/api/order/${orderId}/fulfill`, {
+      const response = await fetch(`${API_BASE_URL}/api/order/${orderId}/fulfill`, {
         method: 'PUT',
       });
-      loadAdminData(); // Reload data
+      
+      if (response.ok) {
+        // Wait a moment then reload data to ensure database is updated
+        setTimeout(() => {
+          loadAdminData();
+        }, 500);
+      } else {
+        console.error('Failed to fulfill order');
+      }
     } catch (error) {
       console.error('Error fulfilling order:', error);
     }
