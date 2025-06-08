@@ -36,15 +36,39 @@ except Exception as e:
 
 # Pydantic models
 class OrderRequest(BaseModel):
-    plan: str  # 'subscription', 'oneoff', or 'express'
-    express: bool = False
+    plan: str  # 'snap', 'snappack', or 'creator'
 
 class OrderResponse(BaseModel):
     orderId: str
     plan: str
-    express: bool
+    price: str
     timestamp: datetime
     whatsappNumber: str
+
+# Plan pricing and details
+PLAN_DETAILS = {
+    'snap': {
+        'name': 'Snap',
+        'price': '$3.99',
+        'description': '1 full-length custom song with cover art',
+        'delivery': '2 hours',
+        'features': ['1 custom song', 'Simple cover art', '2-hour delivery', 'No edits']
+    },
+    'snappack': {
+        'name': 'Snap Pack',
+        'price': '$9.99',
+        'description': '3 songs over 7 days',
+        'delivery': '48 hours each',
+        'features': ['3 custom songs', 'Different moods/vibes', 'Cover art for each', '48-hour delivery']
+    },
+    'creator': {
+        'name': 'Creator Pack',
+        'price': '$24.99/mo',
+        'description': 'Up to 10 songs per month with extras',
+        'delivery': 'Priority',
+        'features': ['Up to 10 songs/month', 'AI stems', 'Instrumentals', 'TikTok clips', 'Priority delivery']
+    }
+}
 
 @app.get("/")
 async def root():
@@ -69,19 +93,24 @@ async def health_check():
 async def generate_order(order_request: OrderRequest):
     """Generate a unique order ID and store order details"""
     try:
+        # Validate plan
+        if order_request.plan not in PLAN_DETAILS:
+            raise HTTPException(status_code=400, detail="Invalid plan type")
+        
+        plan_info = PLAN_DETAILS[order_request.plan]
+        
         # Generate unique order ID
         order_id = f"SS-{uuid.uuid4().hex[:8].upper()}"
-        
-        # Validate plan
-        valid_plans = ['subscription', 'oneoff', 'express']
-        if order_request.plan not in valid_plans:
-            raise HTTPException(status_code=400, detail="Invalid plan type")
         
         # Create order document
         order_doc = {
             "orderId": order_id,
             "plan": order_request.plan,
-            "express": order_request.express,
+            "planName": plan_info['name'],
+            "price": plan_info['price'],
+            "description": plan_info['description'],
+            "delivery": plan_info['delivery'],
+            "features": plan_info['features'],
             "timestamp": datetime.now(),
             "status": "payment_confirmed",
             "whatsappNumber": "+1234567890",  # Replace with your actual WhatsApp number
@@ -94,12 +123,12 @@ async def generate_order(order_request: OrderRequest):
         if not result.inserted_id:
             raise HTTPException(status_code=500, detail="Failed to create order")
         
-        logger.info(f"Order created successfully: {order_id}")
+        logger.info(f"Order created successfully: {order_id} for plan: {order_request.plan}")
         
         return OrderResponse(
             orderId=order_id,
             plan=order_request.plan,
-            express=order_request.express,
+            price=plan_info['price'],
             timestamp=order_doc["timestamp"],
             whatsappNumber=order_doc["whatsappNumber"]
         )
@@ -158,12 +187,14 @@ async def fulfill_order(order_id: str):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/orders")
-async def get_orders(limit: int = 50, fulfilled: Optional[bool] = None):
+async def get_orders(limit: int = 50, fulfilled: Optional[bool] = None, plan: Optional[str] = None):
     """Get list of orders with optional filtering"""
     try:
         query = {}
         if fulfilled is not None:
             query["fulfilled"] = fulfilled
+        if plan is not None:
+            query["plan"] = plan
         
         orders = list(orders_collection.find(query).sort("timestamp", -1).limit(limit))
         
@@ -186,22 +217,29 @@ async def get_stats():
         pending_orders = total_orders - fulfilled_orders
         
         # Count by plan type
-        subscription_orders = orders_collection.count_documents({"plan": "subscription"})
-        oneoff_orders = orders_collection.count_documents({"plan": "oneoff"})
-        express_orders = orders_collection.count_documents({"express": True})
+        snap_orders = orders_collection.count_documents({"plan": "snap"})
+        snappack_orders = orders_collection.count_documents({"plan": "snappack"})
+        creator_orders = orders_collection.count_documents({"plan": "creator"})
         
         return {
             "totalOrders": total_orders,
             "fulfilledOrders": fulfilled_orders,
             "pendingOrders": pending_orders,
-            "subscriptionOrders": subscription_orders,
-            "oneoffOrders": oneoff_orders,
-            "expressOrders": express_orders
+            "planBreakdown": {
+                "snap": snap_orders,
+                "snappack": snappack_orders,
+                "creator": creator_orders
+            }
         }
         
     except Exception as e:
         logger.error(f"Error fetching stats: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/plans")
+async def get_plans():
+    """Get available plans and their details"""
+    return {"plans": PLAN_DETAILS}
 
 if __name__ == "__main__":
     import uvicorn

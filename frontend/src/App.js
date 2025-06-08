@@ -17,12 +17,11 @@ function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const success = urlParams.get('success');
       const plan = urlParams.get('plan');
-      const express = urlParams.get('express');
       
-      console.log('URL Params:', { success, plan, express }); // Debug log
+      console.log('URL Params:', { success, plan }); // Debug log
       
       if (success === 'true' && plan) {
-        generateOrder(plan, express === 'true');
+        generateOrder(plan);
       }
     };
     
@@ -33,14 +32,14 @@ function App() {
     return () => window.removeEventListener('popstate', checkUrlParams);
   }, []);
 
-  const generateOrder = async (plan, express) => {
+  const generateOrder = async (plan) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/generate-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ plan, express: express === 'true' }),
+        body: JSON.stringify({ plan }),
       });
       const data = await response.json();
       setOrderData(data);
@@ -50,47 +49,54 @@ function App() {
     }
   };
 
-  const handlePayment = (plan, isExpress = false) => {
+  const handlePayment = (plan) => {
     // For MVP testing, simulate immediate success instead of external redirect
     // In production, you would replace these URLs with actual Stripe payment links
     
+    const planDetails = {
+      snap: 'Snap ($3.99) - 1 song in 2 hours',
+      snappack: 'Snap Pack ($9.99) - 3 songs over 7 days',
+      creator: 'Creator Pack ($24.99/month) - Up to 10 songs per month'
+    };
+    
     const confirmPayment = window.confirm(
-      `This is a demo. In production, you would be redirected to Stripe to pay for ${plan} ${isExpress ? '+ express' : ''}. Click OK to simulate successful payment.`
+      `This is a demo. In production, you would be redirected to Stripe to pay for ${planDetails[plan]}. Click OK to simulate successful payment.`
     );
     
     if (confirmPayment) {
       // Simulate successful payment by calling generateOrder directly
-      generateOrder(plan, isExpress);
+      generateOrder(plan);
     }
     
     // Alternative: Redirect to Stripe (uncomment for production)
     /*
-    const successUrl = `${window.location.origin}?success=true&plan=${plan}&express=${isExpress}`;
+    const successUrl = `${window.location.origin}?success=true&plan=${plan}`;
     const paymentUrls = {
-      subscription: `https://buy.stripe.com/test_subscription?success_url=${encodeURIComponent(successUrl)}`,
-      oneoff: `https://buy.stripe.com/test_oneoff?success_url=${encodeURIComponent(successUrl)}`,
-      express: `https://buy.stripe.com/test_express?success_url=${encodeURIComponent(successUrl)}`
+      snap: `https://buy.stripe.com/test_snap?success_url=${encodeURIComponent(successUrl)}`,
+      snappack: `https://buy.stripe.com/test_snappack?success_url=${encodeURIComponent(successUrl)}`,
+      creator: `https://buy.stripe.com/test_creator?success_url=${encodeURIComponent(successUrl)}`
     };
     
-    let url;
-    if (isExpress) {
-      url = paymentUrls.express;
-    } else {
-      url = paymentUrls[plan];
-    }
-    
-    window.location.href = url;
+    window.location.href = paymentUrls[plan];
     */
   };
 
   const handleWhatsAppRedirect = () => {
     if (!orderData) return;
     
-    const planText = orderData.plan === 'subscription' ? 'a SongSnaps subscription' : 
-                     orderData.plan === 'express' ? 'an express custom song' : 'a custom song';
-    const expressText = orderData.express ? ' with express delivery (30 minutes!)' : '';
+    const planDescriptions = {
+      snap: 'a Snap (single song)',
+      snappack: 'a Snap Pack (3 songs)',
+      creator: 'a Creator Pack subscription'
+    };
     
-    const message = `Hi! I just purchased ${planText}${expressText}. My order ID is: ${orderData.orderId}. I'm excited to share my song idea with you! 🎵`;
+    const deliveryTimes = {
+      snap: '2 hours',
+      snappack: '48 hours for each song',
+      creator: 'priority delivery'
+    };
+    
+    const message = `Hi! I just purchased ${planDescriptions[orderData.plan] || 'a custom song package'}. My order ID is: ${orderData.orderId}. Expected delivery: ${deliveryTimes[orderData.plan] || '2 hours'}. I'm excited to share my song idea with you! 🎵`;
     const encodedMessage = encodeURIComponent(message);
     
     // Replace +1234567890 with your actual WhatsApp number
@@ -141,6 +147,14 @@ function App() {
   };
 
   if (showSuccess && orderData) {
+    const planDetails = {
+      snap: { name: 'Snap', price: '$3.99', description: '1 full-length custom song' },
+      snappack: { name: 'Snap Pack', price: '$9.99', description: '3 songs over 7 days' },
+      creator: { name: 'Creator Pack', price: '$24.99/mo', description: 'Up to 10 songs per month' }
+    };
+
+    const currentPlan = planDetails[orderData.plan] || { name: 'Custom Plan', price: 'N/A', description: 'Custom package' };
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center">
@@ -155,9 +169,30 @@ function App() {
           <div className="bg-gray-50 rounded-xl p-4 mb-6">
             <h3 className="font-semibold text-gray-800 mb-2">Order Details</h3>
             <p className="text-sm text-gray-600">Order ID: <span className="font-mono font-bold">{orderData.orderId}</span></p>
-            <p className="text-sm text-gray-600">Plan: <span className="capitalize">{orderData.plan === 'express' ? 'Express Song' : orderData.plan}</span></p>
-            {orderData.express && <p className="text-sm text-gray-600">⚡ Express Delivery: ✅ (30 minutes)</p>}
-            {!orderData.express && <p className="text-sm text-gray-600">🕐 Standard Delivery: Within 2 hours</p>}
+            <p className="text-sm text-gray-600">Plan: <span className="font-bold">{currentPlan.name}</span> ({currentPlan.price})</p>
+            <p className="text-xs text-gray-500 mt-1">{currentPlan.description}</p>
+            
+            {orderData.plan === 'snap' && (
+              <div className="mt-2 p-2 bg-blue-50 rounded">
+                <p className="text-xs text-blue-800">🎵 Includes simple cover art</p>
+                <p className="text-xs text-blue-800">⏰ Delivered in 2 hours</p>
+              </div>
+            )}
+            
+            {orderData.plan === 'snappack' && (
+              <div className="mt-2 p-2 bg-purple-50 rounded">
+                <p className="text-xs text-purple-800">🎁 3 unique songs</p>
+                <p className="text-xs text-purple-800">⏰ Delivered within 48 hours each</p>
+              </div>
+            )}
+            
+            {orderData.plan === 'creator' && (
+              <div className="mt-2 p-2 bg-gold-50 rounded">
+                <p className="text-xs text-yellow-800">🎹 Includes AI stems & instrumentals</p>
+                <p className="text-xs text-yellow-800">📱 TikTok-ready 30s clips</p>
+                <p className="text-xs text-yellow-800">⚡ Priority delivery</p>
+              </div>
+            )}
           </div>
           
           <p className="text-gray-600 mb-6">
@@ -188,7 +223,9 @@ function App() {
           </button>
           
           <p className="text-xs text-gray-500 mt-4">
-            Expected delivery: Within 2 hours {orderData.express ? '(Express)' : ''}
+            {orderData.plan === 'snap' && 'Expected delivery: Within 2 hours'}
+            {orderData.plan === 'snappack' && 'Expected delivery: 48 hours per song'}
+            {orderData.plan === 'creator' && 'Priority delivery for all songs'}
           </p>
         </div>
       </div>
@@ -209,21 +246,21 @@ function App() {
               </span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-200 mb-8 max-w-3xl mx-auto">
-              Transform your memories, emotions, and dreams into personalized AI-generated songs. 
-              Delivered to your WhatsApp within 2 hours.
+              Text us your mood, idea, or lyrics. Get full AI-generated songs back fast. 
+              No studio needed.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
-                onClick={() => handlePayment('subscription')}
+                onClick={() => handlePayment('snap')}
                 className="bg-gradient-to-r from-pink-500 to-yellow-500 hover:from-pink-600 hover:to-yellow-600 text-white font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
               >
-                Get Started - $10/month
+                🤳 Get Your Snap - $3.99
               </button>
               <button
-                onClick={() => handlePayment('oneoff')}
+                onClick={() => handlePayment('snappack')}
                 className="border-2 border-white text-white hover:bg-white hover:text-purple-900 font-bold py-4 px-8 rounded-full text-lg transition-all duration-300"
               >
-                Try Once - $5
+                🎁 Snap Pack - $9.99
               </button>
             </div>
             
@@ -231,7 +268,7 @@ function App() {
             <div className="mt-8">
               <button
                 onClick={() => {
-                  window.history.pushState({}, '', '?success=true&plan=subscription&express=false');
+                  window.history.pushState({}, '', '?success=true&plan=snap');
                   window.location.reload();
                 }}
                 className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm"
@@ -316,66 +353,141 @@ function App() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-white mb-4">Choose Your Plan</h2>
-            <p className="text-xl text-gray-200">Perfect songs, delivered fast</p>
+            <p className="text-xl text-gray-200">From quick vibes to creator-level content</p>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Subscription Plan */}
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Snap Plan */}
             <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 border border-white border-opacity-20 hover:scale-105 transition-transform duration-300">
               <div className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-                  </svg>
+                <div className="text-4xl mb-4">🤳</div>
+                <h3 className="text-2xl font-bold text-white mb-2">Snap</h3>
+                <div className="text-4xl font-bold text-white mb-2">$3.99</div>
+                <p className="text-gray-300 mb-6 italic">"Text me your mood, idea, or a line of lyrics. Get a full AI-generated song back in 2 hours."</p>
+                
+                <div className="text-left space-y-2 mb-6">
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    1 full-length custom song
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    Includes simple cover art
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    Delivered via WhatsApp in 2 hours
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                    </svg>
+                    No edits or extras
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">Monthly Magic</h3>
-                <div className="text-4xl font-bold text-white mb-2">$10<span className="text-lg text-gray-300">/month</span></div>
-                <p className="text-gray-300 mb-6">Up to 10 custom songs</p>
+                
                 <button
-                  onClick={() => handlePayment('subscription')}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300"
-                >
-                  Start Subscription
-                </button>
-              </div>
-            </div>
-
-            {/* One-off Plan */}
-            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 border border-white border-opacity-20 hover:scale-105 transition-transform duration-300">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-red-600 rounded-xl flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-2">One Perfect Song</h3>
-                <div className="text-4xl font-bold text-white mb-2">$5<span className="text-lg text-gray-300">/song</span></div>
-                <p className="text-gray-300 mb-6">Single custom creation</p>
-                <button
-                  onClick={() => handlePayment('oneoff')}
+                  onClick={() => handlePayment('snap')}
                   className="w-full bg-gradient-to-r from-pink-500 to-red-600 hover:from-pink-600 hover:to-red-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300"
                 >
-                  Create One Song
+                  Get Your Snap
                 </button>
               </div>
             </div>
 
-            {/* Express Add-on */}
-            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 border border-yellow-400 border-opacity-50 hover:scale-105 transition-transform duration-300 md:col-span-2 lg:col-span-1">
+            {/* Snap Pack Plan */}
+            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 border-2 border-yellow-400 border-opacity-50 hover:scale-105 transition-transform duration-300 relative">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <span className="bg-yellow-400 text-purple-900 px-4 py-2 rounded-full text-sm font-bold">POPULAR</span>
+              </div>
               <div className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-600 rounded-xl flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                  </svg>
+                <div className="text-4xl mb-4">🎁</div>
+                <h3 className="text-2xl font-bold text-white mb-2">Snap Pack</h3>
+                <div className="text-4xl font-bold text-white mb-2">$9.99</div>
+                <p className="text-gray-300 mb-6 italic">"Need more than one song? Get 3 unique AI tracks."</p>
+                
+                <div className="text-left space-y-2 mb-6">
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    3 songs over 7 days
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    Different moods, vibes, or lyrics
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    Delivered within 48 hours each
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7-293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    Includes cover art for each
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">Express Delivery</h3>
-                <div className="text-4xl font-bold text-white mb-2">+$3</div>
-                <p className="text-gray-300 mb-6">Get your song in 30 minutes</p>
+                
                 <button
-                  onClick={() => handlePayment('express', true)}
-                  className="w-full bg-gradient-to-r from-yellow-400 to-orange-600 hover:from-yellow-500 hover:to-orange-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300"
+                  onClick={() => handlePayment('snappack')}
+                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300"
                 >
-                  Rush My Song
+                  Get Snap Pack
+                </button>
+              </div>
+            </div>
+
+            {/* Creator Pack Plan */}
+            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 border border-white border-opacity-20 hover:scale-105 transition-transform duration-300">
+              <div className="text-center">
+                <div className="text-4xl mb-4">💼</div>
+                <h3 className="text-2xl font-bold text-white mb-2">Creator Pack</h3>
+                <div className="text-4xl font-bold text-white mb-2">$24.99<span className="text-lg text-gray-300">/mo</span></div>
+                <p className="text-gray-300 mb-6 italic">"For creators who want sound without a studio."</p>
+                
+                <div className="text-left space-y-2 mb-6">
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    Up to 10 custom songs per month
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    AI stems & instrumentals
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    TikTok-ready 30s clips
+                  </div>
+                  <div className="flex items-center text-sm text-gray-200">
+                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                    Priority WhatsApp delivery
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => handlePayment('creator')}
+                  className="w-full bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300"
+                >
+                  Start Creating
                 </button>
               </div>
             </div>
@@ -397,23 +509,23 @@ function App() {
                 <span className="text-2xl font-bold text-white">1</span>
               </div>
               <h3 className="text-xl font-bold text-white mb-4">Choose & Pay</h3>
-              <p className="text-gray-300">Select your plan and complete payment securely through Stripe</p>
+              <p className="text-gray-300">Pick your plan and pay securely. $3.99 gets you started instantly.</p>
             </div>
             
             <div className="text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="text-2xl font-bold text-white">2</span>
               </div>
-              <h3 className="text-xl font-bold text-white mb-4">Share Your Story</h3>
-              <p className="text-gray-300">Tell us your story, memories, or emotions via WhatsApp</p>
+              <h3 className="text-xl font-bold text-white mb-4">Share Your Vibe</h3>
+              <p className="text-gray-300">Text us your mood, memories, or lyrics on WhatsApp. Be as creative as you want!</p>
             </div>
             
             <div className="text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="text-2xl font-bold text-white">3</span>
               </div>
-              <h3 className="text-xl font-bold text-white mb-4">Receive Your Song</h3>
-              <p className="text-gray-300">Get your personalized AI-generated song within 2 hours</p>
+              <h3 className="text-xl font-bold text-white mb-4">Get Your Song</h3>
+              <p className="text-gray-300">Receive your personalized AI song with cover art. Ready to share!</p>
             </div>
           </div>
         </div>
@@ -423,7 +535,7 @@ function App() {
       <div className="py-12 border-t border-white border-opacity-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h3 className="text-2xl font-bold text-white mb-4">SongSnaps</h3>
-          <p className="text-gray-300">Transforming stories into songs, one beat at a time.</p>
+          <p className="text-gray-300">Your story, your song. No studio needed.</p>
         </div>
       </div>
     </div>
