@@ -1,0 +1,20 @@
+{
+  "name": "songsnaps-mvp",
+  "version": "1.0.0",
+  "description": "SongSnaps - AI-Generated Custom Songs MVP",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && python server.py",
+    "frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "install-deps": "cd frontend && npm install && cd ../backend && pip install -r requirements.txt",
+    "production": "cd backend && python server.py"
+  },
+  "keywords": ["songsnaps", "ai", "music", "mvp"],
+  "author": "SongSnaps Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+}

@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: songsnaps_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: songsnaps_production
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - songsnaps_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: songsnaps_backend
+    restart: unless-stopped
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017/songsnaps_production
+      - NODE_ENV=production
+    depends_on:
+      - mongodb
+    ports:
+      - "8001:8001"
+    networks:
+      - songsnaps_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: songsnaps_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - songsnaps_network
+
+volumes:
+  mongodb_data:
+
+networks:
+  songsnaps_network:
+    driver: bridge
