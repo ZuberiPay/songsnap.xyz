@@ -494,25 +494,16 @@ function App() {
               </button>
             </div>
             
-            {/* Admin Access and Test Buttons */}
-            <div className="mt-8 space-y-2">
+            {/* Test Button - Remove in production */}
+            <div className="mt-8">
               <button
                 onClick={() => {
                   window.history.pushState({}, '', '?success=true&plan=snap');
                   window.location.reload();
                 }}
-                className="block mx-auto bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm transition-all duration-300"
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm transition-all duration-300"
               >
                 🧪 Test Success Page (Demo)
-              </button>
-              <button
-                onClick={() => {
-                  window.history.pushState({}, '', '?admin=true');
-                  window.location.reload();
-                }}
-                className="block mx-auto bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm transition-all duration-300"
-              >
-                👑 Admin Dashboard
               </button>
             </div>
           </div>
