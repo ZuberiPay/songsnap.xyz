@@ -443,6 +443,19 @@ function App() {
   // Main Landing Page
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      {/* Header with Login Button */}
+      <div className="absolute top-0 right-0 z-20 p-6">
+        <button
+          onClick={() => {
+            window.history.pushState({}, '', '?admin=true');
+            window.location.reload();
+          }}
+          className="bg-white bg-opacity-10 hover:bg-opacity-20 text-white font-medium py-2 px-4 rounded-lg backdrop-blur-md border border-white border-opacity-20 transition-all duration-300 text-sm"
+        >
+          Login
+        </button>
+      </div>
+
       {/* Hero Section with Background Image */}
       <div className="relative overflow-hidden min-h-screen flex items-center">
         {/* Background Image */}
