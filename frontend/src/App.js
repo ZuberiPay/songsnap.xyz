@@ -158,7 +158,7 @@ function App() {
           
           <button
             onClick={handleWhatsAppRedirect}
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg mb-4"
           >
             <span className="flex items-center justify-center">
               <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24">
@@ -166,6 +166,17 @@ function App() {
               </svg>
               Continue to WhatsApp
             </span>
+          </button>
+          
+          <button
+            onClick={() => {
+              setShowSuccess(false);
+              setOrderData(null);
+              window.history.pushState({}, '', '/');
+            }}
+            className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-xl transition-all duration-300"
+          >
+            ← Back to Home
           </button>
           
           <p className="text-xs text-gray-500 mt-4">
