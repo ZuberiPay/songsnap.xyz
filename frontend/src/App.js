@@ -86,10 +86,17 @@ function App() {
   const handleWhatsAppRedirect = () => {
     if (!orderData) return;
     
-    const message = `Hi! I just purchased ${orderData.plan === 'subscription' ? 'a SongSnaps subscription' : 'a custom song'} ${orderData.express ? 'with express delivery' : ''}. My order ID is: ${orderData.orderId}. I'm excited to share my song idea with you! 🎵`;
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/1234567890?text=${encodedMessage}`; // Replace with your WhatsApp number
+    const planText = orderData.plan === 'subscription' ? 'a SongSnaps subscription' : 
+                     orderData.plan === 'express' ? 'an express custom song' : 'a custom song';
+    const expressText = orderData.express ? ' with express delivery (30 minutes!)' : '';
     
+    const message = `Hi! I just purchased ${planText}${expressText}. My order ID is: ${orderData.orderId}. I'm excited to share my song idea with you! 🎵`;
+    const encodedMessage = encodeURIComponent(message);
+    
+    // Replace +1234567890 with your actual WhatsApp number
+    const whatsappUrl = `https://wa.me/1234567890?text=${encodedMessage}`;
+    
+    console.log('WhatsApp URL:', whatsappUrl); // Debug log
     window.open(whatsappUrl, '_blank');
   };
 
