@@ -139,8 +139,7 @@ function App() {
     const message = `Hi! I just purchased ${planDescriptions[orderData.plan] || 'a custom song package'}. My order ID is: ${orderData.orderId}. Expected delivery: ${deliveryTimes[orderData.plan] || '2 hours'}. I'm excited to share my song idea with you! 🎵`;
     const encodedMessage = encodeURIComponent(message);
     
-    // Replace +1234567890 with your actual WhatsApp number
-    const whatsappUrl = `https://wa.me/1234567890?text=${encodedMessage}`;
+    const whatsappUrl = `https://wa.me/1234567890?text=${encodedMessage}`; // Replace with your actual WhatsApp number
     
     console.log('WhatsApp URL:', whatsappUrl); // Debug log
     window.open(whatsappUrl, '_blank');
