@@ -207,6 +207,19 @@ function App() {
                 Try Once - $5
               </button>
             </div>
+            
+            {/* URL Test Button - Remove in production */}
+            <div className="mt-8">
+              <button
+                onClick={() => {
+                  window.history.pushState({}, '', '?success=true&plan=subscription&express=false');
+                  window.location.reload();
+                }}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm"
+              >
+                🧪 Test Success Page (Demo)
+              </button>
+            </div>
           </div>
         </div>
       </div>
