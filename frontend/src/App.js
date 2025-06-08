@@ -13,14 +13,24 @@ function App() {
 
   // Check if we're on success page
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-    const plan = urlParams.get('plan');
-    const express = urlParams.get('express');
+    const checkUrlParams = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const success = urlParams.get('success');
+      const plan = urlParams.get('plan');
+      const express = urlParams.get('express');
+      
+      console.log('URL Params:', { success, plan, express }); // Debug log
+      
+      if (success === 'true' && plan) {
+        generateOrder(plan, express === 'true');
+      }
+    };
     
-    if (success === 'true') {
-      generateOrder(plan, express);
-    }
+    checkUrlParams();
+    
+    // Also listen for URL changes
+    window.addEventListener('popstate', checkUrlParams);
+    return () => window.removeEventListener('popstate', checkUrlParams);
   }, []);
 
   const generateOrder = async (plan, express) => {
