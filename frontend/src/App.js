@@ -9,18 +9,25 @@ function App() {
   const [duration, setDuration] = useState(0);
   const audioRef = useRef(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [orderData, setOrderData] = useState(null);
+  const [adminData, setAdminData] = useState({ orders: [], stats: {} });
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
-  // Check if we're on success page
+  // Check if we're on success page or admin page
   useEffect(() => {
     const checkUrlParams = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const success = urlParams.get('success');
       const plan = urlParams.get('plan');
+      const admin = urlParams.get('admin');
       
-      console.log('URL Params:', { success, plan }); // Debug log
+      console.log('URL Params:', { success, plan, admin }); // Debug log
       
-      if (success === 'true' && plan) {
+      if (admin === 'true') {
+        setShowAdmin(true);
+      } else if (success === 'true' && plan) {
         generateOrder(plan);
       }
     };
@@ -49,6 +56,43 @@ function App() {
     }
   };
 
+  const handleAdminLogin = () => {
+    // Simple password check - in production, use proper authentication
+    if (adminPassword === 'songsnaps2024') {
+      setIsAdminAuthenticated(true);
+      loadAdminData();
+    } else {
+      alert('Invalid password');
+    }
+  };
+
+  const loadAdminData = async () => {
+    try {
+      const [ordersResponse, statsResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/orders?limit=100`),
+        fetch(`${API_BASE_URL}/api/stats`)
+      ]);
+      
+      const ordersData = await ordersResponse.json();
+      const statsData = await statsResponse.json();
+      
+      setAdminData({ orders: ordersData.orders, stats: statsData });
+    } catch (error) {
+      console.error('Error loading admin data:', error);
+    }
+  };
+
+  const fulfillOrder = async (orderId) => {
+    try {
+      await fetch(`${API_BASE_URL}/api/order/${orderId}/fulfill`, {
+        method: 'PUT',
+      });
+      loadAdminData(); // Reload data
+    } catch (error) {
+      console.error('Error fulfilling order:', error);
+    }
+  };
+
   const handlePayment = (plan) => {
     // For MVP testing, simulate immediate success instead of external redirect
     // In production, you would replace these URLs with actual Stripe payment links
@@ -67,18 +111,6 @@ function App() {
       // Simulate successful payment by calling generateOrder directly
       generateOrder(plan);
     }
-    
-    // Alternative: Redirect to Stripe (uncomment for production)
-    /*
-    const successUrl = `${window.location.origin}?success=true&plan=${plan}`;
-    const paymentUrls = {
-      snap: `https://buy.stripe.com/test_snap?success_url=${encodeURIComponent(successUrl)}`,
-      snappack: `https://buy.stripe.com/test_snappack?success_url=${encodeURIComponent(successUrl)}`,
-      creator: `https://buy.stripe.com/test_creator?success_url=${encodeURIComponent(successUrl)}`
-    };
-    
-    window.location.href = paymentUrls[plan];
-    */
   };
 
   const handleWhatsAppRedirect = () => {
@@ -146,6 +178,174 @@ function App() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  // Admin Dashboard Component
+  if (showAdmin) {
+    if (!isAdminAuthenticated) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">Admin Access</h1>
+            <input
+              type="password"
+              placeholder="Enter admin password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              className="w-full p-4 border border-gray-300 rounded-xl mb-4"
+              onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+            />
+            <button
+              onClick={handleAdminLogin}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300"
+            >
+              Access Dashboard
+            </button>
+            <button
+              onClick={() => {
+                setShowAdmin(false);
+                window.history.pushState({}, '', '/');
+              }}
+              className="w-full mt-4 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-xl transition-all duration-300"
+            >
+              ← Back to Home
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <div className="bg-white shadow-lg">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-bold text-gray-900">SongSnaps Admin Dashboard</h1>
+              <div className="space-x-4">
+                <button
+                  onClick={loadAdminData}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAdmin(false);
+                    setIsAdminAuthenticated(false);
+                    window.history.pushState({}, '', '/');
+                  }}
+                  className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300"
+                >
+                  ← Back to Site
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Total Orders</h3>
+              <p className="text-3xl font-bold text-blue-600">{adminData.stats.totalOrders || 0}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Pending Orders</h3>
+              <p className="text-3xl font-bold text-yellow-600">{adminData.stats.pendingOrders || 0}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Fulfilled Orders</h3>
+              <p className="text-3xl font-bold text-green-600">{adminData.stats.fulfilledOrders || 0}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Revenue</h3>
+              <p className="text-3xl font-bold text-purple-600">
+                ${((adminData.stats.planBreakdown?.snap || 0) * 3.99 + 
+                   (adminData.stats.planBreakdown?.snappack || 0) * 9.99 + 
+                   (adminData.stats.planBreakdown?.creator || 0) * 24.99).toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {/* Plan Breakdown */}
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Plan Breakdown</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-pink-50 rounded-lg">
+                <p className="text-sm text-gray-600">🤳 Snap Orders</p>
+                <p className="text-2xl font-bold text-pink-600">{adminData.stats.planBreakdown?.snap || 0}</p>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <p className="text-sm text-gray-600">🎁 Snap Pack Orders</p>
+                <p className="text-2xl font-bold text-yellow-600">{adminData.stats.planBreakdown?.snappack || 0}</p>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <p className="text-sm text-gray-600">💼 Creator Pack Orders</p>
+                <p className="text-2xl font-bold text-purple-600">{adminData.stats.planBreakdown?.creator || 0}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Orders Table */}
+          <div className="bg-white rounded-xl shadow-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">Recent Orders</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {adminData.orders.map((order) => (
+                    <tr key={order.orderId} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">{order.orderId}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {order.planName}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.price}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {new Date(order.timestamp).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          order.fulfilled 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {order.fulfilled ? 'Fulfilled' : 'Pending'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {!order.fulfilled && (
+                          <button
+                            onClick={() => fulfillOrder(order.orderId)}
+                            className="text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded-md transition-all duration-300"
+                          >
+                            Mark Fulfilled
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Success Page
   if (showSuccess && orderData) {
     const planDetails = {
       snap: { name: 'Snap', price: '$3.99', description: '1 full-length custom song' },
@@ -157,8 +357,8 @@ function App() {
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center">
-          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center animate-fade-in">
+          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-in">
             <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
             </svg>
@@ -187,7 +387,7 @@ function App() {
             )}
             
             {orderData.plan === 'creator' && (
-              <div className="mt-2 p-2 bg-gold-50 rounded">
+              <div className="mt-2 p-2 bg-yellow-50 rounded">
                 <p className="text-xs text-yellow-800">🎹 Includes AI stems & instrumentals</p>
                 <p className="text-xs text-yellow-800">📱 TikTok-ready 30s clips</p>
                 <p className="text-xs text-yellow-800">⚡ Priority delivery</p>
@@ -201,7 +401,7 @@ function App() {
           
           <button
             onClick={handleWhatsAppRedirect}
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg mb-4"
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg mb-4 whatsapp-btn"
           >
             <span className="flex items-center justify-center">
               <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24">
@@ -232,80 +432,103 @@ function App() {
     );
   }
 
+  // Main Landing Page
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-black opacity-20"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+      {/* Hero Section with Background Image */}
+      <div className="relative overflow-hidden min-h-screen flex items-center">
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://images.pexels.com/photos/8512209/pexels-photo-8512209.jpeg')`
+          }}
+        ></div>
+        
+        {/* Content */}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 z-10">
           <div className="text-center">
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-6 leading-tight animate-fade-in-up">
               Your Story,<br />
               <span className="bg-gradient-to-r from-pink-400 to-yellow-400 bg-clip-text text-transparent">
                 Your Song
               </span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-200 mb-8 max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl md:text-2xl text-gray-200 mb-8 max-w-3xl mx-auto animate-fade-in-up-delay">
               Text us your mood, idea, or lyrics. Get full AI-generated songs back fast. 
               No studio needed.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in-up-delay-2">
               <button
                 onClick={() => handlePayment('snap')}
-                className="bg-gradient-to-r from-pink-500 to-yellow-500 hover:from-pink-600 hover:to-yellow-600 text-white font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                className="w-full sm:w-auto bg-gradient-to-r from-pink-500 to-yellow-500 hover:from-pink-600 hover:to-yellow-600 text-white font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl"
               >
                 🤳 Get Your Snap - $3.99
               </button>
               <button
                 onClick={() => handlePayment('snappack')}
-                className="border-2 border-white text-white hover:bg-white hover:text-purple-900 font-bold py-4 px-8 rounded-full text-lg transition-all duration-300"
+                className="w-full sm:w-auto border-2 border-white text-white hover:bg-white hover:text-purple-900 font-bold py-4 px-8 rounded-full text-lg transition-all duration-300 hover:shadow-2xl"
               >
                 🎁 Snap Pack - $9.99
               </button>
             </div>
             
-            {/* URL Test Button - Remove in production */}
-            <div className="mt-8">
+            {/* Admin Access and Test Buttons */}
+            <div className="mt-8 space-y-2">
               <button
                 onClick={() => {
                   window.history.pushState({}, '', '?success=true&plan=snap');
                   window.location.reload();
                 }}
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm"
+                className="block mx-auto bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm transition-all duration-300"
               >
                 🧪 Test Success Page (Demo)
+              </button>
+              <button
+                onClick={() => {
+                  window.history.pushState({}, '', '?admin=true');
+                  window.location.reload();
+                }}
+                className="block mx-auto bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm transition-all duration-300"
+              >
+                👑 Admin Dashboard
               </button>
             </div>
           </div>
         </div>
+
+        {/* Floating Elements */}
+        <div className="absolute top-1/4 left-10 w-20 h-20 bg-pink-500 rounded-full opacity-20 animate-float"></div>
+        <div className="absolute bottom-1/4 right-10 w-16 h-16 bg-yellow-500 rounded-full opacity-20 animate-float-delay"></div>
+        <div className="absolute top-1/2 left-1/4 w-12 h-12 bg-purple-500 rounded-full opacity-30 animate-float-delay-2"></div>
       </div>
 
       {/* Sample Audio Section */}
       <div className="py-20 bg-white bg-opacity-10 backdrop-blur-lg">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-white mb-4">Listen to the Magic</h2>
-            <p className="text-xl text-gray-200">Sample songs created for our customers</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 animate-fade-in">Listen to the Magic</h2>
+            <p className="text-lg sm:text-xl text-gray-200 animate-fade-in-delay">Sample songs created for our customers</p>
           </div>
           
           {/* Audio Player */}
-          <div className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 max-w-2xl mx-auto">
+          <div className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-6 sm:p-8 max-w-2xl mx-auto shadow-2xl animate-fade-in-up">
             <div className="flex items-center space-x-4 mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-yellow-500 rounded-xl flex items-center justify-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-yellow-500 rounded-xl flex items-center justify-center flex-shrink-0">
                 <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
                 </svg>
               </div>
-              <div>
-                <h3 className="text-white font-semibold text-lg">Sample Love Song</h3>
-                <p className="text-gray-300">Created for Sarah & Mike</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-white font-semibold text-lg truncate">Sample Love Song</h3>
+                <p className="text-gray-300 text-sm truncate">Created for Sarah & Mike</p>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
               <button
                 onClick={togglePlay}
-                className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform"
+                className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform flex-shrink-0"
               >
                 {isPlaying ? (
                   <svg className="w-6 h-6 text-purple-900" fill="currentColor" viewBox="0 0 24 24">
@@ -318,7 +541,7 @@ function App() {
                 )}
               </button>
               
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div
                   className="w-full bg-white bg-opacity-30 rounded-full h-2 cursor-pointer"
                   onClick={handleSeek}
@@ -352,40 +575,40 @@ function App() {
       <div className="py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">Choose Your Plan</h2>
-            <p className="text-xl text-gray-200">From quick vibes to creator-level content</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 animate-fade-in">Choose Your Plan</h2>
+            <p className="text-lg sm:text-xl text-gray-200 animate-fade-in-delay">From quick vibes to creator-level content</p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
             {/* Snap Plan */}
-            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 border border-white border-opacity-20 hover:scale-105 transition-transform duration-300">
+            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-6 lg:p-8 border border-white border-opacity-20 hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fade-in-up">
               <div className="text-center">
                 <div className="text-4xl mb-4">🤳</div>
                 <h3 className="text-2xl font-bold text-white mb-2">Snap</h3>
                 <div className="text-4xl font-bold text-white mb-2">$3.99</div>
-                <p className="text-gray-300 mb-6 italic">"Text me your mood, idea, or a line of lyrics. Get a full AI-generated song back in 2 hours."</p>
+                <p className="text-gray-300 mb-6 italic text-sm sm:text-base">"Text me your mood, idea, or a line of lyrics. Get a full AI-generated song back in 2 hours."</p>
                 
                 <div className="text-left space-y-2 mb-6">
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     1 full-length custom song
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     Includes simple cover art
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     Delivered via WhatsApp in 2 hours
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-red-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"></path>
                     </svg>
                     No edits or extras
@@ -394,7 +617,7 @@ function App() {
                 
                 <button
                   onClick={() => handlePayment('snap')}
-                  className="w-full bg-gradient-to-r from-pink-500 to-red-600 hover:from-pink-600 hover:to-red-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300"
+                  className="w-full bg-gradient-to-r from-pink-500 to-red-600 hover:from-pink-600 hover:to-red-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105"
                 >
                   Get Your Snap
                 </button>
@@ -402,7 +625,7 @@ function App() {
             </div>
 
             {/* Snap Pack Plan */}
-            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 border-2 border-yellow-400 border-opacity-50 hover:scale-105 transition-transform duration-300 relative">
+            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-6 lg:p-8 border-2 border-yellow-400 border-opacity-50 hover:scale-105 transition-all duration-300 relative hover:shadow-2xl animate-fade-in-up-delay">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <span className="bg-yellow-400 text-purple-900 px-4 py-2 rounded-full text-sm font-bold">POPULAR</span>
               </div>
@@ -410,30 +633,30 @@ function App() {
                 <div className="text-4xl mb-4">🎁</div>
                 <h3 className="text-2xl font-bold text-white mb-2">Snap Pack</h3>
                 <div className="text-4xl font-bold text-white mb-2">$9.99</div>
-                <p className="text-gray-300 mb-6 italic">"Need more than one song? Get 3 unique AI tracks."</p>
+                <p className="text-gray-300 mb-6 italic text-sm sm:text-base">"Need more than one song? Get 3 unique AI tracks."</p>
                 
                 <div className="text-left space-y-2 mb-6">
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     3 songs over 7 days
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     Different moods, vibes, or lyrics
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     Delivered within 48 hours each
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7-293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     Includes cover art for each
                   </div>
@@ -441,7 +664,7 @@ function App() {
                 
                 <button
                   onClick={() => handlePayment('snappack')}
-                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300"
+                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105"
                 >
                   Get Snap Pack
                 </button>
@@ -449,34 +672,34 @@ function App() {
             </div>
 
             {/* Creator Pack Plan */}
-            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 border border-white border-opacity-20 hover:scale-105 transition-transform duration-300">
+            <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-6 lg:p-8 border border-white border-opacity-20 hover:scale-105 transition-all duration-300 hover:shadow-2xl animate-fade-in-up-delay-2">
               <div className="text-center">
                 <div className="text-4xl mb-4">💼</div>
                 <h3 className="text-2xl font-bold text-white mb-2">Creator Pack</h3>
                 <div className="text-4xl font-bold text-white mb-2">$24.99<span className="text-lg text-gray-300">/mo</span></div>
-                <p className="text-gray-300 mb-6 italic">"For creators who want sound without a studio."</p>
+                <p className="text-gray-300 mb-6 italic text-sm sm:text-base">"For creators who want sound without a studio."</p>
                 
                 <div className="text-left space-y-2 mb-6">
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     Up to 10 custom songs per month
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     AI stems & instrumentals
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     TikTok-ready 30s clips
                   </div>
                   <div className="flex items-center text-sm text-gray-200">
-                    <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                     </svg>
                     Priority WhatsApp delivery
@@ -485,7 +708,7 @@ function App() {
                 
                 <button
                   onClick={() => handlePayment('creator')}
-                  className="w-full bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300"
+                  className="w-full bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105"
                 >
                   Start Creating
                 </button>
@@ -499,29 +722,29 @@ function App() {
       <div className="py-20 bg-white bg-opacity-5 backdrop-blur-lg">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">How It Works</h2>
-            <p className="text-xl text-gray-200">From idea to song in just a few steps</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 animate-fade-in">How It Works</h2>
+            <p className="text-lg sm:text-xl text-gray-200 animate-fade-in-delay">From idea to song in just a few steps</p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center animate-fade-in-up">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 hover:scale-110 transition-transform duration-300">
                 <span className="text-2xl font-bold text-white">1</span>
               </div>
               <h3 className="text-xl font-bold text-white mb-4">Choose & Pay</h3>
               <p className="text-gray-300">Pick your plan and pay securely. $3.99 gets you started instantly.</p>
             </div>
             
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="text-center animate-fade-in-up-delay">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6 hover:scale-110 transition-transform duration-300">
                 <span className="text-2xl font-bold text-white">2</span>
               </div>
               <h3 className="text-xl font-bold text-white mb-4">Share Your Vibe</h3>
               <p className="text-gray-300">Text us your mood, memories, or lyrics on WhatsApp. Be as creative as you want!</p>
             </div>
             
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="text-center animate-fade-in-up-delay-2">
+              <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6 hover:scale-110 transition-transform duration-300">
                 <span className="text-2xl font-bold text-white">3</span>
               </div>
               <h3 className="text-xl font-bold text-white mb-4">Get Your Song</h3>
