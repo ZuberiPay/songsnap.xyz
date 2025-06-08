@@ -51,10 +51,21 @@ function App() {
   };
 
   const handlePayment = (plan, isExpress = false) => {
-    // Construct redirect URL for after payment
-    const successUrl = `${window.location.origin}?success=true&plan=${plan}&express=${isExpress}`;
+    // For MVP testing, simulate immediate success instead of external redirect
+    // In production, you would replace these URLs with actual Stripe payment links
     
-    // Placeholder Stripe URLs - replace with actual Stripe payment links
+    const confirmPayment = window.confirm(
+      `This is a demo. In production, you would be redirected to Stripe to pay for ${plan} ${isExpress ? '+ express' : ''}. Click OK to simulate successful payment.`
+    );
+    
+    if (confirmPayment) {
+      // Simulate successful payment by calling generateOrder directly
+      generateOrder(plan, isExpress);
+    }
+    
+    // Alternative: Redirect to Stripe (uncomment for production)
+    /*
+    const successUrl = `${window.location.origin}?success=true&plan=${plan}&express=${isExpress}`;
     const paymentUrls = {
       subscription: `https://buy.stripe.com/test_subscription?success_url=${encodeURIComponent(successUrl)}`,
       oneoff: `https://buy.stripe.com/test_oneoff?success_url=${encodeURIComponent(successUrl)}`,
@@ -68,8 +79,8 @@ function App() {
       url = paymentUrls[plan];
     }
     
-    // Redirect to Stripe
     window.location.href = url;
+    */
   };
 
   const handleWhatsAppRedirect = () => {
